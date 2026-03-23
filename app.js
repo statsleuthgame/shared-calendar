@@ -38,6 +38,7 @@ function listenToEvents() {
       renderEvents(events);
     }, (err) => {
       console.error('Firestore listen error:', err);
+      eventList.innerHTML = `<p class="empty-state" style="color:#ff4a6a">Error: ${err.message}</p>`;
     });
 }
 
