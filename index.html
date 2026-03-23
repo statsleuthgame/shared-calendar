@@ -14,7 +14,7 @@
 </head>
 <body>
   <div id="app-screen" class="screen">
-    <header>
+    <header id="app-header">
       <h1>Our Calendar</h1>
     </header>
 
@@ -30,14 +30,14 @@
     </div>
 
     <!-- List View -->
-    <main id="list-view" class="view hidden">
+    <section id="list-view" class="view hidden" role="region" aria-label="Event list">
       <div id="event-list">
         <p class="empty-state">No upcoming events</p>
       </div>
-    </main>
+    </section>
 
     <!-- Calendar View -->
-    <main id="calendar-view" class="view hidden">
+    <section id="calendar-view" class="view hidden" role="region" aria-label="Calendar">
       <div class="cal-header">
         <button id="cal-prev" class="btn-icon cal-nav" aria-label="Previous month">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
@@ -57,7 +57,7 @@
       <div id="cal-day-events">
         <p class="empty-state small">Tap a day to see events</p>
       </div>
-    </main>
+    </section>
 
     <!-- Tab Bar -->
     <nav class="tab-bar">
@@ -90,28 +90,28 @@
           <input type="text" id="event-name" placeholder="What's happening?" required>
         </div>
 
-        <div class="form-field">
-          <label class="field-label">Date</label>
+        <fieldset class="form-field">
+          <legend class="field-label">Date</legend>
           <div class="date-row">
-            <input type="date" id="event-date" required>
+            <input type="date" id="event-date" aria-label="Start date" required>
             <span class="date-separator">to</span>
-            <input type="date" id="event-end-date">
+            <input type="date" id="event-end-date" aria-label="End date">
           </div>
-        </div>
+        </fieldset>
 
-        <div class="form-field">
-          <label class="field-label">Time</label>
+        <fieldset class="form-field">
+          <legend class="field-label">Time</legend>
           <div class="time-row">
-            <input type="time" id="event-time">
+            <input type="time" id="event-time" aria-label="Event time">
             <label class="allday-toggle">
               <input type="checkbox" id="event-allday">
               <span class="allday-label">All Day</span>
             </label>
           </div>
-        </div>
+        </fieldset>
 
-        <div class="form-field">
-          <label class="field-label">Who</label>
+        <fieldset class="form-field">
+          <legend class="field-label">Who</legend>
           <div class="person-picker">
             <label class="person-option">
               <input type="radio" name="event-person" value="Cody" required>
@@ -130,7 +130,7 @@
               <span class="person-label dogs">T&M</span>
             </label>
           </div>
-        </div>
+        </fieldset>
 
         <div class="form-field">
           <label class="field-label" for="event-notes">Notes</label>
@@ -140,7 +140,7 @@
         <div class="modal-actions">
           <button type="button" id="cancel-btn" class="btn btn-secondary">Cancel</button>
           <button type="button" id="delete-btn" class="btn btn-danger hidden">Delete</button>
-          <button type="submit" class="btn btn-primary">Save</button>
+          <button type="submit" id="save-btn" class="btn btn-primary">Save</button>
         </div>
       </form>
     </div>
@@ -160,7 +160,7 @@
   </div>
 
   <!-- Toast -->
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>

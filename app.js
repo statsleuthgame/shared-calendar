@@ -1,50 +1,160 @@
+(function () {
+'use strict';
+
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+var db = firebase.firestore();
 
 // DOM elements
-const eventList = document.getElementById('event-list');
-const addBtn = document.getElementById('add-btn');
-const eventModal = document.getElementById('event-modal');
-const modalTitle = document.getElementById('modal-title');
-const eventForm = document.getElementById('event-form');
-const deleteBtn = document.getElementById('delete-btn');
-const cancelBtn = document.getElementById('cancel-btn');
-const eventDate = document.getElementById('event-date');
-const eventEndDate = document.getElementById('event-end-date');
-const calDays = document.getElementById('cal-days');
-const calMonthLabel = document.getElementById('cal-month-label');
-const calDayEvents = document.getElementById('cal-day-events');
-const eventTime = document.getElementById('event-time');
-const eventAllDay = document.getElementById('event-allday');
-const calTodayBtn = document.getElementById('cal-today');
-const loadingState = document.getElementById('loading-state');
-const listView = document.getElementById('list-view');
-const calendarView = document.getElementById('calendar-view');
-const deleteConfirm = document.getElementById('delete-confirm');
-const toast = document.getElementById('toast');
+var eventList = document.getElementById('event-list');
+var addBtn = document.getElementById('add-btn');
+var eventModal = document.getElementById('event-modal');
+var modalTitle = document.getElementById('modal-title');
+var eventForm = document.getElementById('event-form');
+var deleteBtn = document.getElementById('delete-btn');
+var cancelBtn = document.getElementById('cancel-btn');
+var saveBtn = document.getElementById('save-btn');
+var eventDate = document.getElementById('event-date');
+var eventEndDate = document.getElementById('event-end-date');
+var calDays = document.getElementById('cal-days');
+var calMonthLabel = document.getElementById('cal-month-label');
+var calDayEvents = document.getElementById('cal-day-events');
+var eventTime = document.getElementById('event-time');
+var eventAllDay = document.getElementById('event-allday');
+var calTodayBtn = document.getElementById('cal-today');
+var loadingState = document.getElementById('loading-state');
+var listView = document.getElementById('list-view');
+var calendarView = document.getElementById('calendar-view');
+var deleteConfirm = document.getElementById('delete-confirm');
+var toast = document.getElementById('toast');
+var calGrid = document.getElementById('cal-grid');
 
-let unsubscribe = null;
-let allEvents = [];
-let calYear, calMonth;
-let selectedCalDate = null;
-let hasLoaded = false;
+var unsubscribe = null;
+var allEvents = [];
+var calYear, calMonth;
+var selectedCalDate = null;
+var hasLoaded = false;
+var toastTimer1 = null;
+var toastTimer2 = null;
+var touchStartX = 0;
+var touchStartY = 0;
+var saving = false;
 
 // Init calendar to current month
-const initNow = new Date();
+var initNow = new Date();
 calYear = initNow.getFullYear();
 calMonth = initNow.getMonth();
 
-// Keep end date >= start date
-eventDate.addEventListener('change', () => {
+// ---- Utilities ----
+
+function formatDateISO(date) {
+  var y = date.getFullYear();
+  var m = String(date.getMonth() + 1).padStart(2, '0');
+  var d = String(date.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + d;
+}
+
+function parseDateStr(str) {
+  if (!str || typeof str !== 'string') return new Date(NaN);
+  var parts = str.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(isNaN)) return new Date(NaN);
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
+function forEachDayInRange(startStr, endStr, callback) {
+  var start = parseDateStr(startStr);
+  var end = parseDateStr(endStr);
+  if (isNaN(start) || isNaN(end)) return;
+  for (var d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    callback(formatDateISO(d));
+  }
+}
+
+function navigateMonth(delta) {
+  calMonth += delta;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  selectedCalDate = null;
+  renderCalendar();
+}
+
+function formatDateLabel(dateStr) {
+  var date = parseDateStr(dateStr);
+  if (isNaN(date)) return dateStr;
+  var today = new Date();
+  var tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  var todayStr = formatDateISO(today);
+  var tomorrowStr = formatDateISO(tomorrow);
+
+  if (dateStr === todayStr) {
+    return 'Today — ' + date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+  if (dateStr === tomorrowStr) {
+    return 'Tomorrow — ' + date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatShortDate(dateStr) {
+  var date = parseDateStr(dateStr);
+  if (isNaN(date)) return dateStr;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatTime(timeStr) {
+  if (!timeStr) return '';
+  var parts = timeStr.split(':').map(Number);
+  if (parts.length < 2) return timeStr;
+  var h = parts[0], m = parts[1];
+  var ampm = h >= 12 ? 'PM' : 'AM';
+  var hour = h % 12 || 12;
+  return hour + ':' + String(m).padStart(2, '0') + ' ' + ampm;
+}
+
+// Payday: every other Thursday starting 2026-03-26
+var PAYDAY_ANCHOR = new Date(2026, 2, 26);
+function isPayDay(dateStr) {
+  var date = parseDateStr(dateStr);
+  if (isNaN(date) || date.getDay() !== 4) return false;
+  var diff = Math.floor((date - PAYDAY_ANCHOR) / (1000 * 60 * 60 * 24));
+  return diff % 14 === 0;
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ---- Toast ----
+
+function showToast(message) {
+  if (toastTimer1) clearTimeout(toastTimer1);
+  if (toastTimer2) clearTimeout(toastTimer2);
+  toast.textContent = message;
+  toast.classList.remove('hidden', 'toast-hide');
+  toast.classList.add('toast-show');
+  toastTimer1 = setTimeout(function () {
+    toast.classList.remove('toast-show');
+    toast.classList.add('toast-hide');
+    toastTimer2 = setTimeout(function () {
+      toast.classList.add('hidden');
+      toast.classList.remove('toast-hide');
+      toastTimer1 = null;
+      toastTimer2 = null;
+    }, 300);
+  }, 2000);
+}
+
+// ---- Form Handlers ----
+
+eventDate.addEventListener('change', function () {
   if (eventEndDate.value && eventEndDate.value < eventDate.value) {
     eventEndDate.value = eventDate.value;
   }
   eventEndDate.min = eventDate.value;
 });
 
-// All-day toggle
-eventAllDay.addEventListener('change', () => {
+eventAllDay.addEventListener('change', function () {
   if (eventAllDay.checked) {
     eventTime.value = '';
     eventTime.classList.add('disabled-time');
@@ -53,27 +163,11 @@ eventAllDay.addEventListener('change', () => {
   }
 });
 
-// ---- Toast ----
-
-function showToast(message) {
-  toast.textContent = message;
-  toast.classList.remove('hidden');
-  toast.classList.add('toast-show');
-  setTimeout(() => {
-    toast.classList.remove('toast-show');
-    toast.classList.add('toast-hide');
-    setTimeout(() => {
-      toast.classList.add('hidden');
-      toast.classList.remove('toast-hide');
-    }, 300);
-  }, 2000);
-}
-
 // ---- Tabs ----
 
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+document.querySelectorAll('.tab').forEach(function (tab) {
+  tab.addEventListener('click', function () {
+    document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
     tab.classList.add('active');
     listView.classList.add('hidden');
     calendarView.classList.add('hidden');
@@ -82,45 +176,47 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
-// ---- Events ----
+// ---- Events (Firestore) ----
 
 function listenToEvents() {
   if (unsubscribe) unsubscribe();
 
   unsubscribe = db.collection('events')
-    .onSnapshot((snapshot) => {
-      allEvents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      allEvents.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.allDay ? -1 : b.allDay ? 1 : 0) || (a.time || '').localeCompare(b.time || ''));
+    .onSnapshot(function (snapshot) {
+      allEvents = snapshot.docs.map(function (doc) { return Object.assign({ id: doc.id }, doc.data()); });
+      allEvents.sort(function (a, b) {
+        return (a.date || '').localeCompare(b.date || '') ||
+               (a.allDay ? -1 : b.allDay ? 1 : 0) ||
+               (a.time || '').localeCompare(b.time || '');
+      });
 
-      // Hide loading, show list on first load
       if (!hasLoaded) {
         hasLoaded = true;
         loadingState.classList.add('hidden');
         listView.classList.remove('hidden');
       }
 
-      renderListView(allEvents);
-      renderCalendar();
-    }, (err) => {
+      renderListView();
+      if (!calendarView.classList.contains('hidden')) renderCalendar();
+    }, function (err) {
       console.error('Firestore listen error:', err);
       if (!hasLoaded) {
         hasLoaded = true;
         loadingState.classList.add('hidden');
         listView.classList.remove('hidden');
       }
-      eventList.innerHTML = `<p class="empty-state" style="color:var(--danger)">Error: ${err.message}</p>`;
+      eventList.innerHTML = '<p class="empty-state" style="color:var(--danger)">Error: ' + escapeHtml(err.message) + '</p>';
     });
 }
 
 // ---- List View ----
 
-function renderListView(events) {
-  const now = new Date();
-  const todayStr = formatDateISO(now);
+function renderListView() {
+  var now = new Date();
+  var todayStr = formatDateISO(now);
 
-  const upcoming = events.filter(e => {
-    const endDate = e.endDate || e.date;
-    return endDate >= todayStr;
+  var upcoming = allEvents.filter(function (e) {
+    return (e.endDate || e.date) >= todayStr;
   });
 
   if (upcoming.length === 0) {
@@ -128,168 +224,157 @@ function renderListView(events) {
     return;
   }
 
-  // Group events by each day they span
-  const groups = {};
-  upcoming.forEach(ev => {
-    const start = ev.date;
-    const end = ev.endDate || ev.date;
-    const startDate = parseDateStr(start);
-    const endDate = parseDateStr(end);
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-      const key = formatDateISO(d);
+  var groups = {};
+  upcoming.forEach(function (ev) {
+    forEachDayInRange(ev.date, ev.endDate || ev.date, function (key) {
       if (key >= todayStr) {
         if (!groups[key]) groups[key] = [];
-        // Avoid duplicates in same group
-        if (!groups[key].find(e => e.id === ev.id)) {
+        if (!groups[key].find(function (e) { return e.id === ev.id; })) {
           groups[key].push(ev);
         }
       }
-    }
+    });
   });
 
-  const sortedDates = Object.keys(groups).sort();
-  let html = '';
+  var sortedDates = Object.keys(groups).sort();
+  var html = '';
 
-  for (const date of sortedDates) {
-    const evts = groups[date];
-    const isToday = date === todayStr;
-    html += `<div class="date-group">`;
-    html += `<div class="date-header${isToday ? ' today' : ''}">${formatDateLabel(date)}</div>`;
-
-    evts.forEach(ev => {
-      html += buildEventCard(ev, todayStr);
-    });
-
+  sortedDates.forEach(function (date) {
+    var evts = groups[date];
+    var isToday = date === todayStr;
+    html += '<div class="date-group">';
+    html += '<div class="date-header' + (isToday ? ' today' : '') + '">' + formatDateLabel(date) + '</div>';
+    evts.forEach(function (ev) { html += buildEventCard(ev, todayStr); });
     html += '</div>';
-  }
+  });
 
   eventList.innerHTML = html;
-
-  eventList.querySelectorAll('.event-card').forEach(card => {
-    card.addEventListener('click', () => openEditModal(card.dataset.id));
-  });
 }
 
 function buildEventCard(ev, todayStr) {
-  const person = (ev.person || 'Both').toLowerCase();
-  const timeStr = ev.allDay ? 'All Day' : formatTime(ev.time);
-  const now = new Date();
-  const nowTime = now.getHours() * 60 + now.getMinutes();
+  var person = (ev.person || 'Both').toLowerCase();
+  var timeStr = ev.allDay ? 'All Day' : formatTime(ev.time);
+  var now = new Date();
+  var nowTime = now.getHours() * 60 + now.getMinutes();
 
-  let pastClass = '';
-  const endDate = ev.endDate || ev.date;
+  var pastClass = '';
+  var endDate = ev.endDate || ev.date;
   if (endDate < todayStr) {
     pastClass = ' past';
   } else if (ev.date === todayStr && !ev.endDate && ev.time) {
-    const [h, m] = ev.time.split(':').map(Number);
-    if (h * 60 + m < nowTime) pastClass = ' past';
+    var parts = ev.time.split(':').map(Number);
+    if (parts[0] * 60 + parts[1] < nowTime) pastClass = ' past';
   }
 
-  const notesHtml = ev.notes ? `<div class="event-notes">${escapeHtml(ev.notes)}</div>` : '';
-  const personLabel = ev.person || 'Both';
-
-  let rangeHtml = '';
+  var notesHtml = ev.notes ? '<div class="event-notes">' + escapeHtml(ev.notes) + '</div>' : '';
+  var personLabel = ev.person || 'Both';
+  var rangeHtml = '';
   if (ev.endDate && ev.endDate !== ev.date) {
-    rangeHtml = `<span class="event-range">${formatShortDate(ev.date)} – ${formatShortDate(ev.endDate)}</span>`;
+    rangeHtml = '<span class="event-range">' + formatShortDate(ev.date) + ' – ' + formatShortDate(ev.endDate) + '</span>';
   }
 
-  return `
-    <div class="event-card${pastClass}" data-person="${person}" data-id="${ev.id}" tabindex="0" role="button">
-      <div class="event-time">${timeStr}</div>
-      <div class="event-details">
-        <div class="event-title">${escapeHtml(ev.name)}</div>
-        <div class="event-meta">
-          <span class="event-person ${person}">${escapeHtml(personLabel)}</span>
-          ${rangeHtml}
-        </div>
-        ${notesHtml}
-      </div>
-      <svg class="event-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-    </div>`;
+  return '<div class="event-card' + pastClass + '" data-person="' + person + '" data-id="' + ev.id + '" tabindex="0" role="button">' +
+    '<div class="event-time">' + timeStr + '</div>' +
+    '<div class="event-details">' +
+      '<div class="event-title">' + escapeHtml(ev.name) + '</div>' +
+      '<div class="event-meta">' +
+        '<span class="event-person ' + person + '">' + escapeHtml(personLabel) + '</span>' +
+        rangeHtml +
+      '</div>' +
+      notesHtml +
+    '</div>' +
+    '<svg class="event-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>' +
+  '</div>';
 }
+
+// Event delegation for list view
+eventList.addEventListener('click', function (e) {
+  var card = e.target.closest('.event-card');
+  if (card) openEditModal(card.dataset.id);
+});
+eventList.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    var card = e.target.closest('.event-card');
+    if (card) { e.preventDefault(); openEditModal(card.dataset.id); }
+  }
+});
 
 // ---- Calendar View ----
 
-document.getElementById('cal-prev').addEventListener('click', () => {
-  calMonth--;
-  if (calMonth < 0) { calMonth = 11; calYear--; }
-  selectedCalDate = null;
-  renderCalendar();
-});
+document.getElementById('cal-prev').addEventListener('click', function () { navigateMonth(-1); });
+document.getElementById('cal-next').addEventListener('click', function () { navigateMonth(1); });
 
-document.getElementById('cal-next').addEventListener('click', () => {
-  calMonth++;
-  if (calMonth > 11) { calMonth = 0; calYear++; }
-  selectedCalDate = null;
-  renderCalendar();
-});
-
-// Today button
-calTodayBtn.addEventListener('click', () => {
-  const now = new Date();
+calTodayBtn.addEventListener('click', function () {
+  var now = new Date();
   calYear = now.getFullYear();
   calMonth = now.getMonth();
   selectedCalDate = formatDateISO(now);
   renderCalendar();
 });
 
-// Swipe gestures for month navigation
-let touchStartX = 0;
-let touchEndX = 0;
-const calGrid = document.getElementById('cal-grid');
-
-calGrid.addEventListener('touchstart', (e) => {
+// Swipe gestures with vertical threshold
+calGrid.addEventListener('touchstart', function (e) {
   touchStartX = e.changedTouches[0].screenX;
+  touchStartY = e.changedTouches[0].screenY;
 }, { passive: true });
 
-calGrid.addEventListener('touchend', (e) => {
-  touchEndX = e.changedTouches[0].screenX;
-  const diff = touchStartX - touchEndX;
-  if (Math.abs(diff) > 60) {
-    if (diff > 0) {
-      // Swipe left -> next month
-      calMonth++;
-      if (calMonth > 11) { calMonth = 0; calYear++; }
-    } else {
-      // Swipe right -> prev month
-      calMonth--;
-      if (calMonth < 0) { calMonth = 11; calYear--; }
-    }
-    selectedCalDate = null;
-    renderCalendar();
+calGrid.addEventListener('touchend', function (e) {
+  var deltaX = touchStartX - e.changedTouches[0].screenX;
+  var deltaY = touchStartY - e.changedTouches[0].screenY;
+  if (Math.abs(deltaX) > 60 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+    navigateMonth(deltaX > 0 ? 1 : -1);
   }
 }, { passive: true });
 
-function renderCalendar() {
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'];
-  calMonthLabel.textContent = `${monthNames[calMonth]} ${calYear}`;
+// Event delegation for calendar days
+calDays.addEventListener('click', function (e) {
+  var day = e.target.closest('.cal-day:not(.empty)');
+  if (day) selectCalDay(day);
+});
+calDays.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    var day = e.target.closest('.cal-day:not(.empty)');
+    if (day) { e.preventDefault(); selectCalDay(day); }
+  }
+});
 
-  // Show/hide Today button
-  const now = new Date();
-  const isCurrentMonth = calYear === now.getFullYear() && calMonth === now.getMonth();
+// Event delegation for cal day events
+calDayEvents.addEventListener('click', function (e) {
+  var card = e.target.closest('.event-card');
+  if (card) openEditModal(card.dataset.id);
+});
+calDayEvents.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    var card = e.target.closest('.event-card');
+    if (card) { e.preventDefault(); openEditModal(card.dataset.id); }
+  }
+});
+
+function renderCalendar() {
+  var monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+  calMonthLabel.textContent = monthNames[calMonth] + ' ' + calYear;
+
+  var now = new Date();
+  var isCurrentMonth = calYear === now.getFullYear() && calMonth === now.getMonth();
   calTodayBtn.classList.toggle('hidden', isCurrentMonth);
 
-  const firstDay = new Date(calYear, calMonth, 1).getDay();
-  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-  const todayStr = formatDateISO(now);
+  var firstDay = new Date(calYear, calMonth, 1).getDay();
+  var daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  var todayStr = formatDateISO(now);
 
-  // Build maps for calendar rendering
-  const eventMap = {};
-  const eventCountMap = {};
-  const streakMap = {};
-  const monthPrefix = `${calYear}-${String(calMonth + 1).padStart(2, '0')}`;
+  var eventMap = {};
+  var eventCountMap = {};
+  var streakMap = {};
+  var monthPrefix = calYear + '-' + String(calMonth + 1).padStart(2, '0');
 
-  allEvents.forEach(ev => {
-    const start = ev.date;
-    const end = ev.endDate || ev.date;
-    const person = (ev.person || 'Both').toLowerCase();
-    const isMultiDay = end !== start;
+  allEvents.forEach(function (ev) {
+    var start = ev.date;
+    var end = ev.endDate || ev.date;
+    var person = (ev.person || 'Both').toLowerCase();
+    var isMultiDay = end !== start;
 
-    const startDate = parseDateStr(start);
-    const endDate = parseDateStr(end);
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-      const key = formatDateISO(d);
+    forEachDayInRange(start, end, function (key) {
       if (key.startsWith(monthPrefix)) {
         if (!eventMap[key]) eventMap[key] = new Set();
         eventMap[key].add(person);
@@ -297,89 +382,70 @@ function renderCalendar() {
 
         if (isMultiDay) {
           if (!streakMap[key]) streakMap[key] = { start: false, end: false, mid: false };
-          if (key === start) {
-            streakMap[key].start = true;
-          } else if (key === end) {
-            streakMap[key].end = true;
-          } else {
-            streakMap[key].mid = true;
-          }
+          if (key === start) streakMap[key].start = true;
+          else if (key === end) streakMap[key].end = true;
+          else streakMap[key].mid = true;
         }
       }
-    }
+    });
   });
 
-  let html = '';
+  var html = '';
 
-  for (let i = 0; i < firstDay; i++) {
+  for (var i = 0; i < firstDay; i++) {
     html += '<div class="cal-day empty"></div>';
   }
 
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const isToday = dateStr === todayStr;
-    const isSelected = dateStr === selectedCalDate;
-    const persons = eventMap[dateStr];
+  for (var d = 1; d <= daysInMonth; d++) {
+    var dateStr = calYear + '-' + String(calMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    var isToday = dateStr === todayStr;
+    var isSelected = dateStr === selectedCalDate;
+    var persons = eventMap[dateStr];
 
-    let personClass = '';
+    var personClass = '';
     if (persons) {
-      const arr = [...persons];
-      if (arr.length > 1) {
-        personClass = ' cal-both';
-      } else if (arr.includes('both')) {
-        personClass = ' cal-both';
-      } else if (arr.includes('cody')) {
-        personClass = ' cal-cody';
-      } else if (arr.includes('stef')) {
-        personClass = ' cal-stef';
-      } else if (arr.includes('dogs')) {
-        personClass = ' cal-dogs';
-      }
+      var arr = Array.from(persons);
+      if (arr.length > 1) personClass = ' cal-both';
+      else if (arr.includes('both')) personClass = ' cal-both';
+      else if (arr.includes('cody')) personClass = ' cal-cody';
+      else if (arr.includes('stef')) personClass = ' cal-stef';
+      else if (arr.includes('dogs')) personClass = ' cal-dogs';
     }
 
-    const count = eventCountMap[dateStr] || 0;
-    let intensityClass = '';
+    var count = eventCountMap[dateStr] || 0;
+    var intensityClass = '';
     if (count === 2) intensityClass = ' cal-intensity-2';
     else if (count >= 3) intensityClass = ' cal-intensity-3';
 
-    let tallyHtml = '';
+    var tallyHtml = '';
     if (count > 1) {
-      const dots = Math.min(count, 5);
-      tallyHtml = '<div class="cal-tally">' + '<span class="cal-tally-dot"></span>'.repeat(dots) + '</div>';
+      var dots = Math.min(count, 5);
+      tallyHtml = '<div class="cal-tally">';
+      for (var t = 0; t < dots; t++) tallyHtml += '<span class="cal-tally-dot"></span>';
+      tallyHtml += '</div>';
     }
 
-    const isPayday = isPayDay(dateStr);
+    var isPayday = isPayDay(dateStr);
 
-    let streakClass = '';
-    const streak = streakMap[dateStr];
+    var streakClass = '';
+    var streak = streakMap[dateStr];
     if (streak) {
-      const dayOfWeek = new Date(calYear, calMonth, d).getDay();
-      const isRowStart = dayOfWeek === 0;
-      const isRowEnd = dayOfWeek === 6;
-
-      const flatLeft = (streak.mid || streak.end) && !isRowStart;
-      const flatRight = (streak.mid || streak.start) && !isRowEnd;
-
+      var dayOfWeek = new Date(calYear, calMonth, d).getDay();
+      var flatLeft = (streak.mid || streak.end) && dayOfWeek !== 0;
+      var flatRight = (streak.mid || streak.start) && dayOfWeek !== 6;
       if (flatLeft && flatRight) streakClass = ' streak-mid';
       else if (flatLeft) streakClass = ' streak-end';
       else if (flatRight) streakClass = ' streak-start';
     }
 
-    html += `<div class="cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}${personClass}${intensityClass}${streakClass}" data-date="${dateStr}" tabindex="0" role="button" aria-label="${dateStr}">
-      <span class="cal-day-num">${d}</span>
-      ${isPayday ? '<span class="cal-payday">$</span>' : ''}
-      ${tallyHtml}
-    </div>`;
+    html += '<div class="cal-day' + (isToday ? ' today' : '') + (isSelected ? ' selected' : '') + personClass + intensityClass + streakClass + '" data-date="' + dateStr + '" tabindex="0" role="button" aria-label="' + dateStr + '">' +
+      '<span class="cal-day-num">' + d + '</span>' +
+      (isPayday ? '<span class="cal-payday">$</span>' : '') +
+      tallyHtml +
+    '</div>';
   }
 
   calDays.innerHTML = html;
-
-  calDays.querySelectorAll('.cal-day:not(.empty)').forEach(day => {
-    day.addEventListener('click', () => selectCalDay(day));
-    day.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectCalDay(day); }
-    });
-  });
 
   if (selectedCalDate) {
     renderCalDayEvents(selectedCalDate);
@@ -390,45 +456,34 @@ function renderCalendar() {
 
 function selectCalDay(day) {
   selectedCalDate = day.dataset.date;
-  calDays.querySelectorAll('.cal-day').forEach(d => d.classList.remove('selected'));
+  calDays.querySelectorAll('.cal-day').forEach(function (d) { d.classList.remove('selected'); });
   day.classList.add('selected');
   renderCalDayEvents(selectedCalDate);
 }
 
 function renderCalDayEvents(dateStr) {
-  const dayEvents = allEvents.filter(ev => {
-    const end = ev.endDate || ev.date;
-    return ev.date <= dateStr && end >= dateStr;
+  var dayEvents = allEvents.filter(function (ev) {
+    return ev.date <= dateStr && (ev.endDate || ev.date) >= dateStr;
   });
 
   if (dayEvents.length === 0) {
-    calDayEvents.innerHTML = `<p class="empty-state small">No events on ${formatShortDate(dateStr)}</p>`;
+    calDayEvents.innerHTML = '<p class="empty-state small">No events on ' + formatShortDate(dateStr) + '</p>';
     return;
   }
 
-  const todayStr = formatDateISO(new Date());
-  let html = `<div class="cal-events-header">${formatDateLabel(dateStr)}</div>`;
-  dayEvents.forEach(ev => {
-    html += buildEventCard(ev, todayStr);
-  });
-
+  var todayStr = formatDateISO(new Date());
+  var html = '<div class="cal-events-header">' + formatDateLabel(dateStr) + '</div>';
+  dayEvents.forEach(function (ev) { html += buildEventCard(ev, todayStr); });
   calDayEvents.innerHTML = html;
-
-  calDayEvents.querySelectorAll('.event-card').forEach(card => {
-    card.addEventListener('click', () => openEditModal(card.dataset.id));
-    card.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEditModal(card.dataset.id); }
-    });
-  });
 }
 
 // ---- Modal ----
 
-addBtn.addEventListener('click', () => {
+addBtn.addEventListener('click', function () {
   modalTitle.textContent = 'New Event';
   eventForm.reset();
   document.getElementById('event-id').value = '';
-  const defaultDate = selectedCalDate && !calendarView.classList.contains('hidden')
+  var defaultDate = selectedCalDate && !calendarView.classList.contains('hidden')
     ? selectedCalDate : formatDateISO(new Date());
   eventDate.value = defaultDate;
   eventEndDate.value = '';
@@ -440,19 +495,13 @@ addBtn.addEventListener('click', () => {
   document.getElementById('event-name').focus();
 });
 
-cancelBtn.addEventListener('click', () => closeModal(eventModal));
+cancelBtn.addEventListener('click', function () { closeModal(eventModal); });
+eventModal.querySelector('.modal-backdrop').addEventListener('click', function () { closeModal(eventModal); });
 
-// Click backdrop to close
-eventModal.querySelector('.modal-backdrop').addEventListener('click', () => closeModal(eventModal));
-
-// Escape key closes modals
-document.addEventListener('keydown', (e) => {
+document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape') {
-    if (!deleteConfirm.classList.contains('hidden')) {
-      closeModal(deleteConfirm);
-    } else if (!eventModal.classList.contains('hidden')) {
-      closeModal(eventModal);
-    }
+    if (!deleteConfirm.classList.contains('hidden')) closeModal(deleteConfirm);
+    else if (!eventModal.classList.contains('hidden')) closeModal(eventModal);
   }
 });
 
@@ -464,17 +513,22 @@ function openModal(modal) {
 
 function closeModal(modal) {
   modal.classList.add('modal-closing');
-  setTimeout(() => {
+  var content = modal.querySelector('.modal-content');
+  function onEnd() {
+    content.removeEventListener('animationend', onEnd);
     modal.classList.add('hidden');
     modal.classList.remove('modal-open', 'modal-closing');
     if (eventModal.classList.contains('hidden')) {
       addBtn.classList.remove('fab-rotate');
     }
-  }, 200);
+  }
+  content.addEventListener('animationend', onEnd);
+  // Fallback in case animationend doesn't fire
+  setTimeout(onEnd, 250);
 }
 
 function openEditModal(eventId) {
-  const ev = allEvents.find(e => e.id === eventId);
+  var ev = allEvents.find(function (e) { return e.id === eventId; });
   if (!ev) return;
 
   modalTitle.textContent = 'Edit Event';
@@ -485,27 +539,28 @@ function openEditModal(eventId) {
   eventEndDate.min = ev.date;
   eventTime.value = ev.time || '';
   eventAllDay.checked = ev.allDay || false;
-  if (ev.allDay) {
-    eventTime.classList.add('disabled-time');
-  } else {
-    eventTime.classList.remove('disabled-time');
-  }
+  eventTime.classList.toggle('disabled-time', !!ev.allDay);
   document.getElementById('event-notes').value = ev.notes || '';
 
-  const personValue = ev.person || 'Both';
-  const radio = document.querySelector(`input[name="event-person"][value="${personValue}"]`);
+  var personValue = ev.person || 'Both';
+  var radio = document.querySelector('input[name="event-person"][value="' + personValue + '"]');
   if (radio) radio.checked = true;
 
   deleteBtn.classList.remove('hidden');
   openModal(eventModal);
 }
 
-eventForm.addEventListener('submit', async (e) => {
+eventForm.addEventListener('submit', async function (e) {
   e.preventDefault();
-  const id = document.getElementById('event-id').value;
-  const personRadio = document.querySelector('input[name="event-person"]:checked');
+  if (saving) return;
+  saving = true;
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
 
-  const data = {
+  var id = document.getElementById('event-id').value;
+  var personRadio = document.querySelector('input[name="event-person"]:checked');
+
+  var data = {
     name: document.getElementById('event-name').value.trim(),
     date: eventDate.value,
     endDate: eventEndDate.value || null,
@@ -529,20 +584,19 @@ eventForm.addEventListener('submit', async (e) => {
   } catch (err) {
     console.error('Save error:', err);
     showToast('Failed to save event');
+  } finally {
+    saving = false;
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
   }
 });
 
 // Custom delete confirmation
-deleteBtn.addEventListener('click', () => {
-  openModal(deleteConfirm);
-});
+deleteBtn.addEventListener('click', function () { openModal(deleteConfirm); });
+document.getElementById('confirm-cancel').addEventListener('click', function () { closeModal(deleteConfirm); });
 
-document.getElementById('confirm-cancel').addEventListener('click', () => {
-  closeModal(deleteConfirm);
-});
-
-document.getElementById('confirm-delete').addEventListener('click', async () => {
-  const id = document.getElementById('event-id').value;
+document.getElementById('confirm-delete').addEventListener('click', async function () {
+  var id = document.getElementById('event-id').value;
   if (!id) return;
 
   try {
@@ -556,75 +610,9 @@ document.getElementById('confirm-delete').addEventListener('click', async () => 
   }
 });
 
-deleteConfirm.querySelector('.modal-backdrop').addEventListener('click', () => {
-  closeModal(deleteConfirm);
-});
-
-// ---- Helpers ----
-
-function formatDateISO(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-function parseDateStr(str) {
-  const [y, m, d] = str.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function formatDateLabel(dateStr) {
-  const date = parseDateStr(dateStr);
-  const today = new Date();
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  if (formatDateISO(date) === formatDateISO(today)) {
-    return 'Today — ' + date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  }
-  if (formatDateISO(date) === formatDateISO(tomorrow)) {
-    return 'Tomorrow — ' + date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  }
-
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function formatShortDate(dateStr) {
-  const date = parseDateStr(dateStr);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function formatTime(timeStr) {
-  if (!timeStr) return '';
-  const [h, m] = timeStr.split(':').map(Number);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const hour = h % 12 || 12;
-  return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
-}
-
-// Payday: every other Thursday starting 2026-03-26
-const PAYDAY_ANCHOR = new Date(2026, 2, 26);
-function isPayDay(dateStr) {
-  const date = parseDateStr(dateStr);
-  if (date.getDay() !== 4) return false;
-  const diff = Math.round((date - PAYDAY_ANCHOR) / (1000 * 60 * 60 * 24));
-  return diff % 14 === 0;
-}
-
-function escapeHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-// ---- Service Worker ----
-
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    registrations.forEach(r => r.unregister());
-  }).then(() => {
-    caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
-  });
-}
+deleteConfirm.querySelector('.modal-backdrop').addEventListener('click', function () { closeModal(deleteConfirm); });
 
 // ---- Start ----
 listenToEvents();
+
+})();

@@ -19,6 +19,7 @@
   --dogs: #f5c542;
   --border: #2a2a4a;
   --radius: 12px;
+  --header-height: 57px;
   color-scheme: dark;
 }
 
@@ -61,6 +62,7 @@ html, body {
 }
 
 .btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.5; pointer-events: none; }
 
 .btn-primary {
   background: var(--accent);
@@ -130,6 +132,19 @@ header h1 {
   font-size: 14px;
 }
 
+/* Fieldset reset */
+fieldset.form-field {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+fieldset.form-field legend.field-label {
+  float: left;
+  width: 100%;
+  margin-bottom: 6px;
+}
+
 /* ---- Loading Skeleton ---- */
 
 .skeleton-list {
@@ -182,7 +197,7 @@ header h1 {
   color: var(--text-muted);
   padding: 8px 4px 6px;
   position: sticky;
-  top: 57px;
+  top: var(--header-height);
   background: var(--bg);
   z-index: 5;
 }
@@ -311,6 +326,7 @@ header h1 {
   transition: background 0.15s;
 }
 
+.btn-today:hover { background: var(--surface-hover); }
 .btn-today:active { background: var(--surface-hover); }
 
 .cal-grid {
@@ -345,7 +361,6 @@ header h1 {
   min-height: 48px;
 }
 
-/* Streak shapes for multi-day events */
 .cal-day.streak-start { border-radius: 10px 0 0 10px; }
 .cal-day.streak-mid { border-radius: 0; }
 .cal-day.streak-end { border-radius: 0 10px 10px 0; }
@@ -370,19 +385,17 @@ header h1 {
   outline-offset: -2px;
 }
 
-/* Person-colored day highlights — intensity 1 (default) */
+/* Person-colored day highlights — 3 intensity levels */
 .cal-day.cal-cody { background: rgba(74, 158, 255, 0.15); }
 .cal-day.cal-stef { background: rgba(255, 110, 180, 0.15); }
 .cal-day.cal-both { background: rgba(167, 139, 250, 0.15); }
 .cal-day.cal-dogs { background: rgba(245, 197, 66, 0.15); }
 
-/* Intensity 2 */
 .cal-day.cal-cody.cal-intensity-2 { background: rgba(74, 158, 255, 0.3); }
 .cal-day.cal-stef.cal-intensity-2 { background: rgba(255, 110, 180, 0.3); }
 .cal-day.cal-both.cal-intensity-2 { background: rgba(167, 139, 250, 0.3); }
 .cal-day.cal-dogs.cal-intensity-2 { background: rgba(245, 197, 66, 0.3); }
 
-/* Intensity 3+ */
 .cal-day.cal-cody.cal-intensity-3 { background: rgba(74, 158, 255, 0.45); }
 .cal-day.cal-stef.cal-intensity-3 { background: rgba(255, 110, 180, 0.45); }
 .cal-day.cal-both.cal-intensity-3 { background: rgba(167, 139, 250, 0.45); }
@@ -408,26 +421,17 @@ header h1 {
   content: '';
   position: absolute;
   bottom: 0;
-  left: 0;
-  right: 0;
+  left: 8px;
+  right: 8px;
   height: 3px;
   z-index: 1;
+  border-radius: 2px;
 }
 
 .cal-day.cal-cody::after { background: #6cb4ff; }
 .cal-day.cal-stef::after { background: #ff8ec8; }
 .cal-day.cal-both::after { background: #beaafc; }
 .cal-day.cal-dogs::after { background: #f7d76a; }
-
-/* Inset the line so it stops before rounded edges */
-.cal-day.cal-cody::after,
-.cal-day.cal-stef::after,
-.cal-day.cal-both::after,
-.cal-day.cal-dogs::after {
-  left: 8px;
-  right: 8px;
-  border-radius: 2px;
-}
 
 .cal-day.streak-start::after { left: 8px; right: 0; }
 .cal-day.streak-end::after { left: 0; right: 8px; }
@@ -564,7 +568,10 @@ header h1 {
 
 .modal {
   position: fixed;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: 100;
   display: flex;
   align-items: flex-end;
@@ -573,7 +580,10 @@ header h1 {
 
 .modal-backdrop {
   position: absolute;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -868,9 +878,7 @@ header h1 {
 }
 
 /* Safe area for notched phones */
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .fab { bottom: calc(76px + env(safe-area-inset-bottom)); }
-  .modal-content { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
-  .view { padding-bottom: calc(140px + env(safe-area-inset-bottom)); }
-  .toast { bottom: calc(80px + env(safe-area-inset-bottom)); }
-}
+.fab { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+.modal-content { padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px)); }
+.view { padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px)); }
+.toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
