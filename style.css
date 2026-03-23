@@ -336,10 +336,15 @@ header h1 {
 .cal-day.cal-both.cal-intensity-3 { background: rgba(167, 139, 250, 0.45); }
 .cal-day.cal-dogs.cal-intensity-3 { background: rgba(245, 197, 66, 0.45); }
 
-.cal-day.cal-cody .cal-day-num { color: var(--cody); font-weight: 600; border-bottom: 2px solid var(--cody); padding-bottom: 2px; }
-.cal-day.cal-stef .cal-day-num { color: var(--stef); font-weight: 600; border-bottom: 2px solid var(--stef); padding-bottom: 2px; }
-.cal-day.cal-both .cal-day-num { color: var(--both); font-weight: 600; border-bottom: 2px solid var(--both); padding-bottom: 2px; }
-.cal-day.cal-dogs .cal-day-num { color: var(--dogs); font-weight: 600; border-bottom: 2px solid var(--dogs); padding-bottom: 2px; }
+.cal-day.cal-cody .cal-day-num { color: var(--cody); font-weight: 600; }
+.cal-day.cal-stef .cal-day-num { color: var(--stef); font-weight: 600; }
+.cal-day.cal-both .cal-day-num { color: var(--both); font-weight: 600; }
+.cal-day.cal-dogs .cal-day-num { color: var(--dogs); font-weight: 600; }
+
+.cal-day.cal-cody { border-bottom: 2px solid var(--cody); }
+.cal-day.cal-stef { border-bottom: 2px solid var(--stef); }
+.cal-day.cal-both { border-bottom: 2px solid var(--both); }
+.cal-day.cal-dogs { border-bottom: 2px solid var(--dogs); }
 
 /* Tally dots */
 .cal-tally {
