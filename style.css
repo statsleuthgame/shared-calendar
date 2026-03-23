@@ -358,12 +358,13 @@ header h1 {
   left: 0;
   right: 0;
   height: 3px;
+  z-index: 1;
 }
 
-.cal-day.cal-cody::after { background: var(--cody); }
-.cal-day.cal-stef::after { background: var(--stef); }
-.cal-day.cal-both::after { background: var(--both); }
-.cal-day.cal-dogs::after { background: var(--dogs); }
+.cal-day.cal-cody::after { background: #6cb4ff; }
+.cal-day.cal-stef::after { background: #ff8ec8; }
+.cal-day.cal-both::after { background: #beaafc; }
+.cal-day.cal-dogs::after { background: #f7d76a; }
 
 /* Respect streak rounding on the bottom line */
 .cal-day.streak-start::after { border-radius: 0 0 0 10px; }
