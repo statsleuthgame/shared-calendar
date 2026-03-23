@@ -341,10 +341,10 @@ header h1 {
 .cal-day.cal-both .cal-day-num { color: var(--both); font-weight: 600; }
 .cal-day.cal-dogs .cal-day-num { color: var(--dogs); font-weight: 600; }
 
-.cal-day.cal-cody { border-bottom: 2px solid var(--cody); }
-.cal-day.cal-stef { border-bottom: 2px solid var(--stef); }
-.cal-day.cal-both { border-bottom: 2px solid var(--both); }
-.cal-day.cal-dogs { border-bottom: 2px solid var(--dogs); }
+.cal-day.cal-cody { border-bottom: 3px solid var(--cody); padding-bottom: 3px; }
+.cal-day.cal-stef { border-bottom: 3px solid var(--stef); padding-bottom: 3px; }
+.cal-day.cal-both { border-bottom: 3px solid var(--both); padding-bottom: 3px; }
+.cal-day.cal-dogs { border-bottom: 3px solid var(--dogs); padding-bottom: 3px; }
 
 /* Tally dots */
 .cal-tally {
