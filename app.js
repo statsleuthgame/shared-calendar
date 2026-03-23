@@ -182,10 +182,10 @@ function renderCalendar() {
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
   const todayStr = formatDateISO(new Date());
 
-  // Build a map of date -> array of person colors for this month
-  const eventMap = {};
-  // Track multi-day streak positions: date -> { start, end } booleans
-  const streakMap = {};
+  // Build maps for calendar rendering
+  const eventMap = {};      // date -> Set of person names
+  const eventCountMap = {}; // date -> total event count
+  const streakMap = {};     // date -> { start, end, mid } for multi-day events
   const monthPrefix = `${calYear}-${String(calMonth + 1).padStart(2, '0')}`;
 
   allEvents.forEach(ev => {
@@ -201,8 +201,8 @@ function renderCalendar() {
       if (key.startsWith(monthPrefix)) {
         if (!eventMap[key]) eventMap[key] = new Set();
         eventMap[key].add(person);
+        eventCountMap[key] = (eventCountMap[key] || 0) + 1;
 
-        // Track streak edges for multi-day events
         if (isMultiDay) {
           if (!streakMap[key]) streakMap[key] = { start: false, end: false, mid: false };
           if (key === start) {
@@ -247,6 +247,19 @@ function renderCalendar() {
       }
     }
 
+    // Intensity level based on event count (1=light, 2=medium, 3+=heavy)
+    const count = eventCountMap[dateStr] || 0;
+    let intensityClass = '';
+    if (count === 2) intensityClass = ' cal-intensity-2';
+    else if (count >= 3) intensityClass = ' cal-intensity-3';
+
+    // Tally dots for multiple events
+    let tallyHtml = '';
+    if (count > 1) {
+      const dots = Math.min(count, 5); // cap at 5 dots
+      tallyHtml = '<div class="cal-tally">' + '<span class="cal-tally-dot"></span>'.repeat(dots) + '</div>';
+    }
+
     const isPayday = isPayDay(dateStr);
 
     // Streak classes for connected multi-day highlights
@@ -254,10 +267,9 @@ function renderCalendar() {
     const streak = streakMap[dateStr];
     if (streak) {
       const dayOfWeek = new Date(calYear, calMonth, d).getDay();
-      const isRowStart = dayOfWeek === 0; // Sunday
-      const isRowEnd = dayOfWeek === 6;   // Saturday
+      const isRowStart = dayOfWeek === 0;
+      const isRowEnd = dayOfWeek === 6;
 
-      // Determine if left/right sides should be rounded or flat
       const flatLeft = (streak.mid || streak.end) && !isRowStart;
       const flatRight = (streak.mid || streak.start) && !isRowEnd;
 
@@ -266,9 +278,10 @@ function renderCalendar() {
       else if (flatRight) streakClass = ' streak-start';
     }
 
-    html += `<div class="cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}${personClass}${streakClass}" data-date="${dateStr}">
+    html += `<div class="cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}${personClass}${intensityClass}${streakClass}" data-date="${dateStr}">
       <span class="cal-day-num">${d}</span>
       ${isPayday ? '<span class="cal-payday">$</span>' : ''}
+      ${tallyHtml}
     </div>`;
   }
 

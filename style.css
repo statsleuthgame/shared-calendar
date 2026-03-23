@@ -318,28 +318,43 @@ header h1 {
   outline: 2px solid var(--accent);
 }
 
-/* Person-colored day highlights */
-.cal-day.cal-cody {
-  background: rgba(74, 158, 255, 0.2);
-}
+/* Person-colored day highlights — intensity 1 (default) */
+.cal-day.cal-cody { background: rgba(74, 158, 255, 0.15); }
+.cal-day.cal-stef { background: rgba(255, 110, 180, 0.15); }
+.cal-day.cal-both { background: rgba(167, 139, 250, 0.15); }
+.cal-day.cal-dogs { background: rgba(245, 197, 66, 0.15); }
 
-.cal-day.cal-stef {
-  background: rgba(255, 110, 180, 0.2);
-}
+/* Intensity 2 */
+.cal-day.cal-cody.cal-intensity-2 { background: rgba(74, 158, 255, 0.3); }
+.cal-day.cal-stef.cal-intensity-2 { background: rgba(255, 110, 180, 0.3); }
+.cal-day.cal-both.cal-intensity-2 { background: rgba(167, 139, 250, 0.3); }
+.cal-day.cal-dogs.cal-intensity-2 { background: rgba(245, 197, 66, 0.3); }
 
-.cal-day.cal-both {
-  background: rgba(167, 139, 250, 0.2);
-}
+/* Intensity 3+ */
+.cal-day.cal-cody.cal-intensity-3 { background: rgba(74, 158, 255, 0.45); }
+.cal-day.cal-stef.cal-intensity-3 { background: rgba(255, 110, 180, 0.45); }
+.cal-day.cal-both.cal-intensity-3 { background: rgba(167, 139, 250, 0.45); }
+.cal-day.cal-dogs.cal-intensity-3 { background: rgba(245, 197, 66, 0.45); }
 
 .cal-day.cal-cody .cal-day-num { color: var(--cody); font-weight: 600; }
 .cal-day.cal-stef .cal-day-num { color: var(--stef); font-weight: 600; }
 .cal-day.cal-both .cal-day-num { color: var(--both); font-weight: 600; }
+.cal-day.cal-dogs .cal-day-num { color: var(--dogs); font-weight: 600; }
 
-.cal-day.cal-dogs {
-  background: rgba(245, 197, 66, 0.2);
+/* Tally dots */
+.cal-tally {
+  display: flex;
+  gap: 2px;
+  margin-top: 2px;
 }
 
-.cal-day.cal-dogs .cal-day-num { color: var(--dogs); font-weight: 600; }
+.cal-tally-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text);
+  opacity: 0.6;
+}
 
 .cal-payday {
   font-size: 11px;
