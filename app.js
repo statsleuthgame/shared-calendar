@@ -12,8 +12,19 @@ const deleteBtn = document.getElementById('delete-btn');
 const cancelBtn = document.getElementById('cancel-btn');
 const eventDate = document.getElementById('event-date');
 const eventEndDate = document.getElementById('event-end-date');
+const calDays = document.getElementById('cal-days');
+const calMonthLabel = document.getElementById('cal-month-label');
+const calDayEvents = document.getElementById('cal-day-events');
 
 let unsubscribe = null;
+let allEvents = [];
+let calYear, calMonth;
+let selectedCalDate = null;
+
+// Init calendar to current month
+const now = new Date();
+calYear = now.getFullYear();
+calMonth = now.getMonth();
 
 // Keep end date >= start date
 eventDate.addEventListener('change', () => {
@@ -23,6 +34,18 @@ eventDate.addEventListener('change', () => {
   eventEndDate.min = eventDate.value;
 });
 
+// ---- Tabs ----
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+    document.getElementById(tab.dataset.tab).classList.remove('hidden');
+    if (tab.dataset.tab === 'calendar-view') renderCalendar();
+  });
+});
+
 // ---- Events ----
 
 function listenToEvents() {
@@ -30,20 +53,22 @@ function listenToEvents() {
 
   unsubscribe = db.collection('events')
     .onSnapshot((snapshot) => {
-      const events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      events.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.time || '').localeCompare(b.time || ''));
-      renderEvents(events);
+      allEvents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      allEvents.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.time || '').localeCompare(b.time || ''));
+      renderListView(allEvents);
+      renderCalendar();
     }, (err) => {
       console.error('Firestore listen error:', err);
       eventList.innerHTML = `<p class="empty-state" style="color:#ff4a6a">Error: ${err.message}</p>`;
     });
 }
 
-function renderEvents(events) {
-  const now = new Date();
-  const todayStr = formatDateISO(now);
+// ---- List View ----
 
-  // Show events where the end date (or start date if no end) is today or later
+function renderListView(events) {
+  const todayStr = formatDateISO(new Date());
+  const nowTime = now.getHours() * 60 + now.getMinutes();
+
   const upcoming = events.filter(e => {
     const endDate = e.endDate || e.date;
     return endDate >= todayStr;
@@ -54,60 +79,23 @@ function renderEvents(events) {
     return;
   }
 
-  // Group by start date
   const groups = {};
   upcoming.forEach(ev => {
     if (!groups[ev.date]) groups[ev.date] = [];
     groups[ev.date].push(ev);
   });
 
-  // Sort date keys
   const sortedDates = Object.keys(groups).sort();
-
   let html = '';
-  const nowTime = now.getHours() * 60 + now.getMinutes();
 
   for (const date of sortedDates) {
     const evts = groups[date];
     const isToday = date === todayStr;
-    const dateLabel = formatDateLabel(date);
     html += `<div class="date-group">`;
-    html += `<div class="date-header${isToday ? ' today' : ''}">${dateLabel}</div>`;
+    html += `<div class="date-header${isToday ? ' today' : ''}">${formatDateLabel(date)}</div>`;
 
     evts.forEach(ev => {
-      const person = (ev.person || 'Both').toLowerCase();
-      const timeStr = formatTime(ev.time);
-
-      let pastClass = '';
-      const endDate = ev.endDate || ev.date;
-      if (endDate < todayStr) {
-        pastClass = ' past';
-      } else if (isToday && !ev.endDate && ev.time) {
-        const [h, m] = ev.time.split(':').map(Number);
-        if (h * 60 + m < nowTime) pastClass = ' past';
-      }
-
-      const notesHtml = ev.notes ? `<div class="event-notes">${escapeHtml(ev.notes)}</div>` : '';
-      const personLabel = ev.person || 'Both';
-
-      // Date range badge
-      let rangeHtml = '';
-      if (ev.endDate && ev.endDate !== ev.date) {
-        rangeHtml = `<span class="event-range">${formatShortDate(ev.date)} – ${formatShortDate(ev.endDate)}</span>`;
-      }
-
-      html += `
-        <div class="event-card${pastClass}" data-person="${person}" data-id="${ev.id}">
-          <div class="event-time">${timeStr}</div>
-          <div class="event-details">
-            <div class="event-title">${escapeHtml(ev.name)}</div>
-            <div class="event-meta">
-              <span class="event-person ${person}">${escapeHtml(personLabel)}</span>
-              ${rangeHtml}
-            </div>
-            ${notesHtml}
-          </div>
-        </div>`;
+      html += buildEventCard(ev, todayStr);
     });
 
     html += '</div>';
@@ -115,9 +103,161 @@ function renderEvents(events) {
 
   eventList.innerHTML = html;
 
-  // Click to edit
   eventList.querySelectorAll('.event-card').forEach(card => {
-    card.addEventListener('click', () => openEditModal(card.dataset.id, events));
+    card.addEventListener('click', () => openEditModal(card.dataset.id));
+  });
+}
+
+function buildEventCard(ev, todayStr) {
+  const person = (ev.person || 'Both').toLowerCase();
+  const timeStr = formatTime(ev.time);
+  const now = new Date();
+  const nowTime = now.getHours() * 60 + now.getMinutes();
+
+  let pastClass = '';
+  const endDate = ev.endDate || ev.date;
+  if (endDate < todayStr) {
+    pastClass = ' past';
+  } else if (ev.date === todayStr && !ev.endDate && ev.time) {
+    const [h, m] = ev.time.split(':').map(Number);
+    if (h * 60 + m < nowTime) pastClass = ' past';
+  }
+
+  const notesHtml = ev.notes ? `<div class="event-notes">${escapeHtml(ev.notes)}</div>` : '';
+  const personLabel = ev.person || 'Both';
+
+  let rangeHtml = '';
+  if (ev.endDate && ev.endDate !== ev.date) {
+    rangeHtml = `<span class="event-range">${formatShortDate(ev.date)} – ${formatShortDate(ev.endDate)}</span>`;
+  }
+
+  return `
+    <div class="event-card${pastClass}" data-person="${person}" data-id="${ev.id}">
+      <div class="event-time">${timeStr}</div>
+      <div class="event-details">
+        <div class="event-title">${escapeHtml(ev.name)}</div>
+        <div class="event-meta">
+          <span class="event-person ${person}">${escapeHtml(personLabel)}</span>
+          ${rangeHtml}
+        </div>
+        ${notesHtml}
+      </div>
+    </div>`;
+}
+
+// ---- Calendar View ----
+
+document.getElementById('cal-prev').addEventListener('click', () => {
+  calMonth--;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  selectedCalDate = null;
+  renderCalendar();
+});
+
+document.getElementById('cal-next').addEventListener('click', () => {
+  calMonth++;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  selectedCalDate = null;
+  renderCalendar();
+});
+
+function renderCalendar() {
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+  calMonthLabel.textContent = `${monthNames[calMonth]} ${calYear}`;
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const todayStr = formatDateISO(new Date());
+
+  // Build a map of date -> array of person colors for this month
+  const eventMap = {};
+  allEvents.forEach(ev => {
+    const start = ev.date;
+    const end = ev.endDate || ev.date;
+    const person = (ev.person || 'Both').toLowerCase();
+
+    // Walk through each day in the event range
+    const startDate = parseDateStr(start);
+    const endDate = parseDateStr(end);
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const key = formatDateISO(d);
+      // Only include days in current month view
+      if (key.startsWith(`${calYear}-${String(calMonth + 1).padStart(2, '0')}`)) {
+        if (!eventMap[key]) eventMap[key] = new Set();
+        eventMap[key].add(person);
+      }
+    }
+  });
+
+  let html = '';
+
+  // Empty cells before first day
+  for (let i = 0; i < firstDay; i++) {
+    html += '<div class="cal-day empty"></div>';
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const isToday = dateStr === todayStr;
+    const isSelected = dateStr === selectedCalDate;
+    const persons = eventMap[dateStr];
+
+    let dotsHtml = '';
+    if (persons) {
+      const dots = [...persons].map(p => `<span class="cal-dot ${p}"></span>`).join('');
+      dotsHtml = `<div class="cal-dots">${dots}</div>`;
+    }
+
+    html += `<div class="cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}${persons ? ' has-events' : ''}" data-date="${dateStr}">
+      <span class="cal-day-num">${d}</span>
+      ${dotsHtml}
+    </div>`;
+  }
+
+  calDays.innerHTML = html;
+
+  // Click handler for days
+  calDays.querySelectorAll('.cal-day:not(.empty)').forEach(day => {
+    day.addEventListener('click', () => {
+      selectedCalDate = day.dataset.date;
+      // Update selected state
+      calDays.querySelectorAll('.cal-day').forEach(d => d.classList.remove('selected'));
+      day.classList.add('selected');
+      renderCalDayEvents(selectedCalDate);
+    });
+  });
+
+  // Re-render selected day events if one is selected
+  if (selectedCalDate) {
+    renderCalDayEvents(selectedCalDate);
+  } else {
+    calDayEvents.innerHTML = '<p class="empty-state small">Tap a day to see events</p>';
+  }
+}
+
+function renderCalDayEvents(dateStr) {
+  // Find events that overlap this date
+  const dayEvents = allEvents.filter(ev => {
+    const end = ev.endDate || ev.date;
+    return ev.date <= dateStr && end >= dateStr;
+  });
+
+  if (dayEvents.length === 0) {
+    calDayEvents.innerHTML = `<p class="empty-state small">No events on ${formatShortDate(dateStr)}</p>`;
+    return;
+  }
+
+  const todayStr = formatDateISO(new Date());
+  let html = `<div class="cal-events-header">${formatDateLabel(dateStr)}</div>`;
+  dayEvents.forEach(ev => {
+    html += buildEventCard(ev, todayStr);
+  });
+
+  calDayEvents.innerHTML = html;
+
+  calDayEvents.querySelectorAll('.event-card').forEach(card => {
+    card.addEventListener('click', () => openEditModal(card.dataset.id));
   });
 }
 
@@ -127,7 +267,10 @@ addBtn.addEventListener('click', () => {
   modalTitle.textContent = 'New Event';
   eventForm.reset();
   document.getElementById('event-id').value = '';
-  eventDate.value = formatDateISO(new Date());
+  // If in calendar view with a selected date, use that date
+  const defaultDate = selectedCalDate && !document.getElementById('calendar-view').classList.contains('hidden')
+    ? selectedCalDate : formatDateISO(new Date());
+  eventDate.value = defaultDate;
   eventEndDate.value = '';
   eventEndDate.min = eventDate.value;
   deleteBtn.classList.add('hidden');
@@ -145,8 +288,8 @@ function closeModal() {
   eventModal.classList.add('hidden');
 }
 
-function openEditModal(eventId, events) {
-  const ev = events.find(e => e.id === eventId);
+function openEditModal(eventId) {
+  const ev = allEvents.find(e => e.id === eventId);
   if (!ev) return;
 
   modalTitle.textContent = 'Edit Event';
@@ -218,9 +361,13 @@ function formatDateISO(date) {
   return `${y}-${m}-${d}`;
 }
 
+function parseDateStr(str) {
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 function formatDateLabel(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
+  const date = parseDateStr(dateStr);
   const today = new Date();
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -236,8 +383,7 @@ function formatDateLabel(dateStr) {
 }
 
 function formatShortDate(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
+  const date = parseDateStr(dateStr);
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
@@ -257,7 +403,6 @@ function escapeHtml(str) {
 
 // ---- Service Worker ----
 
-// Unregister old SW that was caching stale files, then re-register clean one
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(registrations => {
     registrations.forEach(r => r.unregister());
