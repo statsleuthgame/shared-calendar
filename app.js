@@ -28,13 +28,10 @@ eventDate.addEventListener('change', () => {
 function listenToEvents() {
   if (unsubscribe) unsubscribe();
 
-  // Single orderBy to avoid needing a composite index
   unsubscribe = db.collection('events')
-    .orderBy('date')
     .onSnapshot((snapshot) => {
       const events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Sort by date then time client-side
-      events.sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''));
+      events.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.time || '').localeCompare(b.time || ''));
       renderEvents(events);
     }, (err) => {
       console.error('Firestore listen error:', err);
