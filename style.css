@@ -297,26 +297,25 @@ header h1 {
 }
 
 .cal-day.selected {
-  background: var(--surface);
   outline: 2px solid var(--accent);
 }
 
-.cal-dots {
-  display: flex;
-  gap: 3px;
-  margin-top: 4px;
+/* Person-colored day highlights */
+.cal-day.cal-cody {
+  background: rgba(74, 158, 255, 0.2);
 }
 
-.cal-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--both);
+.cal-day.cal-stef {
+  background: rgba(255, 110, 180, 0.2);
 }
 
-.cal-dot.cody { background: var(--cody); }
-.cal-dot.stef { background: var(--stef); }
-.cal-dot.both { background: var(--both); }
+.cal-day.cal-both {
+  background: rgba(167, 139, 250, 0.2);
+}
+
+.cal-day.cal-cody .cal-day-num { color: var(--cody); font-weight: 600; }
+.cal-day.cal-stef .cal-day-num { color: var(--stef); font-weight: 600; }
+.cal-day.cal-both .cal-day-num { color: var(--both); font-weight: 600; }
 
 #cal-day-events {
   border-top: 1px solid var(--border);

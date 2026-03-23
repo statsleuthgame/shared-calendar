@@ -203,15 +203,21 @@ function renderCalendar() {
     const isSelected = dateStr === selectedCalDate;
     const persons = eventMap[dateStr];
 
-    let dotsHtml = '';
+    // Determine highlight class based on person(s)
+    let personClass = '';
     if (persons) {
-      const dots = [...persons].map(p => `<span class="cal-dot ${p}"></span>`).join('');
-      dotsHtml = `<div class="cal-dots">${dots}</div>`;
+      const arr = [...persons];
+      if (arr.length > 1 || arr.includes('both')) {
+        personClass = ' cal-both';
+      } else if (arr.includes('cody')) {
+        personClass = ' cal-cody';
+      } else if (arr.includes('stef')) {
+        personClass = ' cal-stef';
+      }
     }
 
-    html += `<div class="cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}${persons ? ' has-events' : ''}" data-date="${dateStr}">
+    html += `<div class="cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}${personClass}" data-date="${dateStr}">
       <span class="cal-day-num">${d}</span>
-      ${dotsHtml}
     </div>`;
   }
 
