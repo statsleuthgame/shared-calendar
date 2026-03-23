@@ -329,6 +329,14 @@ header h1 {
 
 .cal-day.cal-dogs .cal-day-num { color: var(--dogs); font-weight: 600; }
 
+.cal-payday {
+  font-size: 11px;
+  font-weight: 700;
+  color: #4ade80;
+  line-height: 1;
+  margin-top: 2px;
+}
+
 #cal-day-events {
   border-top: 1px solid var(--border);
   padding-top: 8px;

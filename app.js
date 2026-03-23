@@ -232,8 +232,11 @@ function renderCalendar() {
       }
     }
 
+    const isPayday = isPayDay(dateStr);
+
     html += `<div class="cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}${personClass}" data-date="${dateStr}">
       <span class="cal-day-num">${d}</span>
+      ${isPayday ? '<span class="cal-payday">$</span>' : ''}
     </div>`;
   }
 
@@ -424,6 +427,15 @@ function formatTime(timeStr) {
   const ampm = h >= 12 ? 'PM' : 'AM';
   const hour = h % 12 || 12;
   return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
+// Payday: every other Thursday starting 2026-03-26
+const PAYDAY_ANCHOR = new Date(2026, 2, 26); // Thu Mar 26 2026
+function isPayDay(dateStr) {
+  const date = parseDateStr(dateStr);
+  if (date.getDay() !== 4) return false; // Not Thursday
+  const diff = Math.round((date - PAYDAY_ANCHOR) / (1000 * 60 * 60 * 24));
+  return diff % 14 === 0;
 }
 
 function escapeHtml(str) {
