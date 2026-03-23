@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Our Calendar">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <title>Our Calendar</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Main App Screen -->
+  <div id="app-screen" class="screen">
+    <header>
+      <h1>Our Calendar</h1>
+    </header>
+
+    <main id="event-list">
+      <p class="empty-state">No upcoming events</p>
+    </main>
+
+    <button id="add-btn" class="fab" title="Add event">+</button>
+  </div>
+
+  <!-- Add/Edit Event Modal -->
+  <div id="event-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2 id="modal-title">New Event</h2>
+      <form id="event-form">
+        <input type="text" id="event-name" placeholder="Event name" required>
+        <input type="date" id="event-date" required>
+        <input type="time" id="event-time" required>
+
+        <div class="person-picker">
+          <label class="person-option">
+            <input type="radio" name="event-person" value="Cody" required>
+            <span class="person-label cody">Cody</span>
+          </label>
+          <label class="person-option">
+            <input type="radio" name="event-person" value="Stef">
+            <span class="person-label stef">Stef</span>
+          </label>
+          <label class="person-option">
+            <input type="radio" name="event-person" value="Both">
+            <span class="person-label both">Both</span>
+          </label>
+        </div>
+
+        <textarea id="event-notes" placeholder="Notes (optional)" rows="3"></textarea>
+        <input type="hidden" id="event-id">
+        <div class="modal-actions">
+          <button type="button" id="cancel-btn" class="btn btn-secondary">Cancel</button>
+          <button type="button" id="delete-btn" class="btn btn-danger hidden">Delete</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
