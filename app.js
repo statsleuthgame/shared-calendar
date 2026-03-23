@@ -184,20 +184,35 @@ function renderCalendar() {
 
   // Build a map of date -> array of person colors for this month
   const eventMap = {};
+  // Track multi-day streak positions: date -> { start, end } booleans
+  const streakMap = {};
+  const monthPrefix = `${calYear}-${String(calMonth + 1).padStart(2, '0')}`;
+
   allEvents.forEach(ev => {
     const start = ev.date;
     const end = ev.endDate || ev.date;
     const person = (ev.person || 'Both').toLowerCase();
+    const isMultiDay = end !== start;
 
-    // Walk through each day in the event range
     const startDate = parseDateStr(start);
     const endDate = parseDateStr(end);
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
       const key = formatDateISO(d);
-      // Only include days in current month view
-      if (key.startsWith(`${calYear}-${String(calMonth + 1).padStart(2, '0')}`)) {
+      if (key.startsWith(monthPrefix)) {
         if (!eventMap[key]) eventMap[key] = new Set();
         eventMap[key].add(person);
+
+        // Track streak edges for multi-day events
+        if (isMultiDay) {
+          if (!streakMap[key]) streakMap[key] = { start: false, end: false, mid: false };
+          if (key === start) {
+            streakMap[key].start = true;
+          } else if (key === end) {
+            streakMap[key].end = true;
+          } else {
+            streakMap[key].mid = true;
+          }
+        }
       }
     }
   });
@@ -234,7 +249,24 @@ function renderCalendar() {
 
     const isPayday = isPayDay(dateStr);
 
-    html += `<div class="cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}${personClass}" data-date="${dateStr}">
+    // Streak classes for connected multi-day highlights
+    let streakClass = '';
+    const streak = streakMap[dateStr];
+    if (streak) {
+      const dayOfWeek = new Date(calYear, calMonth, d).getDay();
+      const isRowStart = dayOfWeek === 0; // Sunday
+      const isRowEnd = dayOfWeek === 6;   // Saturday
+
+      // Determine if left/right sides should be rounded or flat
+      const flatLeft = (streak.mid || streak.end) && !isRowStart;
+      const flatRight = (streak.mid || streak.start) && !isRowEnd;
+
+      if (flatLeft && flatRight) streakClass = ' streak-mid';
+      else if (flatLeft) streakClass = ' streak-end';
+      else if (flatRight) streakClass = ' streak-start';
+    }
+
+    html += `<div class="cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}${personClass}${streakClass}" data-date="${dateStr}">
       <span class="cal-day-num">${d}</span>
       ${isPayday ? '<span class="cal-payday">$</span>' : ''}
     </div>`;
