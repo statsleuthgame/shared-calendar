@@ -17,16 +17,23 @@ const calMonthLabel = document.getElementById('cal-month-label');
 const calDayEvents = document.getElementById('cal-day-events');
 const eventTime = document.getElementById('event-time');
 const eventAllDay = document.getElementById('event-allday');
+const calTodayBtn = document.getElementById('cal-today');
+const loadingState = document.getElementById('loading-state');
+const listView = document.getElementById('list-view');
+const calendarView = document.getElementById('calendar-view');
+const deleteConfirm = document.getElementById('delete-confirm');
+const toast = document.getElementById('toast');
 
 let unsubscribe = null;
 let allEvents = [];
 let calYear, calMonth;
 let selectedCalDate = null;
+let hasLoaded = false;
 
 // Init calendar to current month
-const now = new Date();
-calYear = now.getFullYear();
-calMonth = now.getMonth();
+const initNow = new Date();
+calYear = initNow.getFullYear();
+calMonth = initNow.getMonth();
 
 // Keep end date >= start date
 eventDate.addEventListener('change', () => {
@@ -46,13 +53,30 @@ eventAllDay.addEventListener('change', () => {
   }
 });
 
+// ---- Toast ----
+
+function showToast(message) {
+  toast.textContent = message;
+  toast.classList.remove('hidden');
+  toast.classList.add('toast-show');
+  setTimeout(() => {
+    toast.classList.remove('toast-show');
+    toast.classList.add('toast-hide');
+    setTimeout(() => {
+      toast.classList.add('hidden');
+      toast.classList.remove('toast-hide');
+    }, 300);
+  }, 2000);
+}
+
 // ---- Tabs ----
 
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
-    document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+    listView.classList.add('hidden');
+    calendarView.classList.add('hidden');
     document.getElementById(tab.dataset.tab).classList.remove('hidden');
     if (tab.dataset.tab === 'calendar-view') renderCalendar();
   });
@@ -67,19 +91,32 @@ function listenToEvents() {
     .onSnapshot((snapshot) => {
       allEvents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       allEvents.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.allDay ? -1 : b.allDay ? 1 : 0) || (a.time || '').localeCompare(b.time || ''));
+
+      // Hide loading, show list on first load
+      if (!hasLoaded) {
+        hasLoaded = true;
+        loadingState.classList.add('hidden');
+        listView.classList.remove('hidden');
+      }
+
       renderListView(allEvents);
       renderCalendar();
     }, (err) => {
       console.error('Firestore listen error:', err);
-      eventList.innerHTML = `<p class="empty-state" style="color:#ff4a6a">Error: ${err.message}</p>`;
+      if (!hasLoaded) {
+        hasLoaded = true;
+        loadingState.classList.add('hidden');
+        listView.classList.remove('hidden');
+      }
+      eventList.innerHTML = `<p class="empty-state" style="color:var(--danger)">Error: ${err.message}</p>`;
     });
 }
 
 // ---- List View ----
 
 function renderListView(events) {
-  const todayStr = formatDateISO(new Date());
-  const nowTime = now.getHours() * 60 + now.getMinutes();
+  const now = new Date();
+  const todayStr = formatDateISO(now);
 
   const upcoming = events.filter(e => {
     const endDate = e.endDate || e.date;
@@ -91,10 +128,23 @@ function renderListView(events) {
     return;
   }
 
+  // Group events by each day they span
   const groups = {};
   upcoming.forEach(ev => {
-    if (!groups[ev.date]) groups[ev.date] = [];
-    groups[ev.date].push(ev);
+    const start = ev.date;
+    const end = ev.endDate || ev.date;
+    const startDate = parseDateStr(start);
+    const endDate = parseDateStr(end);
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const key = formatDateISO(d);
+      if (key >= todayStr) {
+        if (!groups[key]) groups[key] = [];
+        // Avoid duplicates in same group
+        if (!groups[key].find(e => e.id === ev.id)) {
+          groups[key].push(ev);
+        }
+      }
+    }
   });
 
   const sortedDates = Object.keys(groups).sort();
@@ -144,7 +194,7 @@ function buildEventCard(ev, todayStr) {
   }
 
   return `
-    <div class="event-card${pastClass}" data-person="${person}" data-id="${ev.id}">
+    <div class="event-card${pastClass}" data-person="${person}" data-id="${ev.id}" tabindex="0" role="button">
       <div class="event-time">${timeStr}</div>
       <div class="event-details">
         <div class="event-title">${escapeHtml(ev.name)}</div>
@@ -154,6 +204,7 @@ function buildEventCard(ev, todayStr) {
         </div>
         ${notesHtml}
       </div>
+      <svg class="event-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
     </div>`;
 }
 
@@ -173,19 +224,60 @@ document.getElementById('cal-next').addEventListener('click', () => {
   renderCalendar();
 });
 
+// Today button
+calTodayBtn.addEventListener('click', () => {
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+  selectedCalDate = formatDateISO(now);
+  renderCalendar();
+});
+
+// Swipe gestures for month navigation
+let touchStartX = 0;
+let touchEndX = 0;
+const calGrid = document.getElementById('cal-grid');
+
+calGrid.addEventListener('touchstart', (e) => {
+  touchStartX = e.changedTouches[0].screenX;
+}, { passive: true });
+
+calGrid.addEventListener('touchend', (e) => {
+  touchEndX = e.changedTouches[0].screenX;
+  const diff = touchStartX - touchEndX;
+  if (Math.abs(diff) > 60) {
+    if (diff > 0) {
+      // Swipe left -> next month
+      calMonth++;
+      if (calMonth > 11) { calMonth = 0; calYear++; }
+    } else {
+      // Swipe right -> prev month
+      calMonth--;
+      if (calMonth < 0) { calMonth = 11; calYear--; }
+    }
+    selectedCalDate = null;
+    renderCalendar();
+  }
+}, { passive: true });
+
 function renderCalendar() {
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
   calMonthLabel.textContent = `${monthNames[calMonth]} ${calYear}`;
 
+  // Show/hide Today button
+  const now = new Date();
+  const isCurrentMonth = calYear === now.getFullYear() && calMonth === now.getMonth();
+  calTodayBtn.classList.toggle('hidden', isCurrentMonth);
+
   const firstDay = new Date(calYear, calMonth, 1).getDay();
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-  const todayStr = formatDateISO(new Date());
+  const todayStr = formatDateISO(now);
 
   // Build maps for calendar rendering
-  const eventMap = {};      // date -> Set of person names
-  const eventCountMap = {}; // date -> total event count
-  const streakMap = {};     // date -> { start, end, mid } for multi-day events
+  const eventMap = {};
+  const eventCountMap = {};
+  const streakMap = {};
   const monthPrefix = `${calYear}-${String(calMonth + 1).padStart(2, '0')}`;
 
   allEvents.forEach(ev => {
@@ -219,7 +311,6 @@ function renderCalendar() {
 
   let html = '';
 
-  // Empty cells before first day
   for (let i = 0; i < firstDay; i++) {
     html += '<div class="cal-day empty"></div>';
   }
@@ -230,7 +321,6 @@ function renderCalendar() {
     const isSelected = dateStr === selectedCalDate;
     const persons = eventMap[dateStr];
 
-    // Determine highlight class based on person(s)
     let personClass = '';
     if (persons) {
       const arr = [...persons];
@@ -247,22 +337,19 @@ function renderCalendar() {
       }
     }
 
-    // Intensity level based on event count (1=light, 2=medium, 3+=heavy)
     const count = eventCountMap[dateStr] || 0;
     let intensityClass = '';
     if (count === 2) intensityClass = ' cal-intensity-2';
     else if (count >= 3) intensityClass = ' cal-intensity-3';
 
-    // Tally dots for multiple events
     let tallyHtml = '';
     if (count > 1) {
-      const dots = Math.min(count, 5); // cap at 5 dots
+      const dots = Math.min(count, 5);
       tallyHtml = '<div class="cal-tally">' + '<span class="cal-tally-dot"></span>'.repeat(dots) + '</div>';
     }
 
     const isPayday = isPayDay(dateStr);
 
-    // Streak classes for connected multi-day highlights
     let streakClass = '';
     const streak = streakMap[dateStr];
     if (streak) {
@@ -278,7 +365,7 @@ function renderCalendar() {
       else if (flatRight) streakClass = ' streak-start';
     }
 
-    html += `<div class="cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}${personClass}${intensityClass}${streakClass}" data-date="${dateStr}">
+    html += `<div class="cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}${personClass}${intensityClass}${streakClass}" data-date="${dateStr}" tabindex="0" role="button" aria-label="${dateStr}">
       <span class="cal-day-num">${d}</span>
       ${isPayday ? '<span class="cal-payday">$</span>' : ''}
       ${tallyHtml}
@@ -287,18 +374,13 @@ function renderCalendar() {
 
   calDays.innerHTML = html;
 
-  // Click handler for days
   calDays.querySelectorAll('.cal-day:not(.empty)').forEach(day => {
-    day.addEventListener('click', () => {
-      selectedCalDate = day.dataset.date;
-      // Update selected state
-      calDays.querySelectorAll('.cal-day').forEach(d => d.classList.remove('selected'));
-      day.classList.add('selected');
-      renderCalDayEvents(selectedCalDate);
+    day.addEventListener('click', () => selectCalDay(day));
+    day.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectCalDay(day); }
     });
   });
 
-  // Re-render selected day events if one is selected
   if (selectedCalDate) {
     renderCalDayEvents(selectedCalDate);
   } else {
@@ -306,8 +388,14 @@ function renderCalendar() {
   }
 }
 
+function selectCalDay(day) {
+  selectedCalDate = day.dataset.date;
+  calDays.querySelectorAll('.cal-day').forEach(d => d.classList.remove('selected'));
+  day.classList.add('selected');
+  renderCalDayEvents(selectedCalDate);
+}
+
 function renderCalDayEvents(dateStr) {
-  // Find events that overlap this date
   const dayEvents = allEvents.filter(ev => {
     const end = ev.endDate || ev.date;
     return ev.date <= dateStr && end >= dateStr;
@@ -328,6 +416,9 @@ function renderCalDayEvents(dateStr) {
 
   calDayEvents.querySelectorAll('.event-card').forEach(card => {
     card.addEventListener('click', () => openEditModal(card.dataset.id));
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEditModal(card.dataset.id); }
+    });
   });
 }
 
@@ -337,8 +428,7 @@ addBtn.addEventListener('click', () => {
   modalTitle.textContent = 'New Event';
   eventForm.reset();
   document.getElementById('event-id').value = '';
-  // If in calendar view with a selected date, use that date
-  const defaultDate = selectedCalDate && !document.getElementById('calendar-view').classList.contains('hidden')
+  const defaultDate = selectedCalDate && !calendarView.classList.contains('hidden')
     ? selectedCalDate : formatDateISO(new Date());
   eventDate.value = defaultDate;
   eventEndDate.value = '';
@@ -346,18 +436,41 @@ addBtn.addEventListener('click', () => {
   eventAllDay.checked = false;
   eventTime.classList.remove('disabled-time');
   deleteBtn.classList.add('hidden');
-  eventModal.classList.remove('hidden');
+  openModal(eventModal);
   document.getElementById('event-name').focus();
 });
 
-cancelBtn.addEventListener('click', closeModal);
+cancelBtn.addEventListener('click', () => closeModal(eventModal));
 
-eventModal.addEventListener('click', (e) => {
-  if (e.target === eventModal) closeModal();
+// Click backdrop to close
+eventModal.querySelector('.modal-backdrop').addEventListener('click', () => closeModal(eventModal));
+
+// Escape key closes modals
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (!deleteConfirm.classList.contains('hidden')) {
+      closeModal(deleteConfirm);
+    } else if (!eventModal.classList.contains('hidden')) {
+      closeModal(eventModal);
+    }
+  }
 });
 
-function closeModal() {
-  eventModal.classList.add('hidden');
+function openModal(modal) {
+  modal.classList.remove('hidden');
+  modal.classList.add('modal-open');
+  addBtn.classList.add('fab-rotate');
+}
+
+function closeModal(modal) {
+  modal.classList.add('modal-closing');
+  setTimeout(() => {
+    modal.classList.add('hidden');
+    modal.classList.remove('modal-open', 'modal-closing');
+    if (eventModal.classList.contains('hidden')) {
+      addBtn.classList.remove('fab-rotate');
+    }
+  }, 200);
 }
 
 function openEditModal(eventId) {
@@ -384,7 +497,7 @@ function openEditModal(eventId) {
   if (radio) radio.checked = true;
 
   deleteBtn.classList.remove('hidden');
-  eventModal.classList.remove('hidden');
+  openModal(eventModal);
 }
 
 eventForm.addEventListener('submit', async (e) => {
@@ -406,29 +519,45 @@ eventForm.addEventListener('submit', async (e) => {
   try {
     if (id) {
       await db.collection('events').doc(id).update(data);
+      showToast('Event updated');
     } else {
       data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
       await db.collection('events').add(data);
+      showToast('Event added');
     }
-    closeModal();
+    closeModal(eventModal);
   } catch (err) {
     console.error('Save error:', err);
-    alert('Failed to save event. Please try again.');
+    showToast('Failed to save event');
   }
 });
 
-deleteBtn.addEventListener('click', async () => {
+// Custom delete confirmation
+deleteBtn.addEventListener('click', () => {
+  openModal(deleteConfirm);
+});
+
+document.getElementById('confirm-cancel').addEventListener('click', () => {
+  closeModal(deleteConfirm);
+});
+
+document.getElementById('confirm-delete').addEventListener('click', async () => {
   const id = document.getElementById('event-id').value;
   if (!id) return;
-  if (!confirm('Delete this event?')) return;
 
   try {
     await db.collection('events').doc(id).delete();
-    closeModal();
+    closeModal(deleteConfirm);
+    closeModal(eventModal);
+    showToast('Event deleted');
   } catch (err) {
     console.error('Delete error:', err);
-    alert('Failed to delete event.');
+    showToast('Failed to delete event');
   }
+});
+
+deleteConfirm.querySelector('.modal-backdrop').addEventListener('click', () => {
+  closeModal(deleteConfirm);
 });
 
 // ---- Helpers ----
@@ -475,18 +604,16 @@ function formatTime(timeStr) {
 }
 
 // Payday: every other Thursday starting 2026-03-26
-const PAYDAY_ANCHOR = new Date(2026, 2, 26); // Thu Mar 26 2026
+const PAYDAY_ANCHOR = new Date(2026, 2, 26);
 function isPayDay(dateStr) {
   const date = parseDateStr(dateStr);
-  if (date.getDay() !== 4) return false; // Not Thursday
+  if (date.getDay() !== 4) return false;
   const diff = Math.round((date - PAYDAY_ANCHOR) / (1000 * 60 * 60 * 24));
   return diff % 14 === 0;
 }
 
 function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // ---- Service Worker ----
