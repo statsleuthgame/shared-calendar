@@ -15,6 +15,8 @@ const eventEndDate = document.getElementById('event-end-date');
 const calDays = document.getElementById('cal-days');
 const calMonthLabel = document.getElementById('cal-month-label');
 const calDayEvents = document.getElementById('cal-day-events');
+const eventTime = document.getElementById('event-time');
+const eventAllDay = document.getElementById('event-allday');
 
 let unsubscribe = null;
 let allEvents = [];
@@ -32,6 +34,16 @@ eventDate.addEventListener('change', () => {
     eventEndDate.value = eventDate.value;
   }
   eventEndDate.min = eventDate.value;
+});
+
+// All-day toggle
+eventAllDay.addEventListener('change', () => {
+  if (eventAllDay.checked) {
+    eventTime.value = '';
+    eventTime.classList.add('disabled-time');
+  } else {
+    eventTime.classList.remove('disabled-time');
+  }
 });
 
 // ---- Tabs ----
@@ -54,7 +66,7 @@ function listenToEvents() {
   unsubscribe = db.collection('events')
     .onSnapshot((snapshot) => {
       allEvents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      allEvents.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.time || '').localeCompare(b.time || ''));
+      allEvents.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.allDay ? -1 : b.allDay ? 1 : 0) || (a.time || '').localeCompare(b.time || ''));
       renderListView(allEvents);
       renderCalendar();
     }, (err) => {
@@ -110,7 +122,7 @@ function renderListView(events) {
 
 function buildEventCard(ev, todayStr) {
   const person = (ev.person || 'Both').toLowerCase();
-  const timeStr = formatTime(ev.time);
+  const timeStr = ev.allDay ? 'All Day' : formatTime(ev.time);
   const now = new Date();
   const nowTime = now.getHours() * 60 + now.getMinutes();
 
@@ -283,6 +295,8 @@ addBtn.addEventListener('click', () => {
   eventDate.value = defaultDate;
   eventEndDate.value = '';
   eventEndDate.min = eventDate.value;
+  eventAllDay.checked = false;
+  eventTime.classList.remove('disabled-time');
   deleteBtn.classList.add('hidden');
   eventModal.classList.remove('hidden');
   document.getElementById('event-name').focus();
@@ -308,7 +322,13 @@ function openEditModal(eventId) {
   eventDate.value = ev.date;
   eventEndDate.value = ev.endDate || '';
   eventEndDate.min = ev.date;
-  document.getElementById('event-time').value = ev.time;
+  eventTime.value = ev.time || '';
+  eventAllDay.checked = ev.allDay || false;
+  if (ev.allDay) {
+    eventTime.classList.add('disabled-time');
+  } else {
+    eventTime.classList.remove('disabled-time');
+  }
   document.getElementById('event-notes').value = ev.notes || '';
 
   const personValue = ev.person || 'Both';
@@ -328,7 +348,8 @@ eventForm.addEventListener('submit', async (e) => {
     name: document.getElementById('event-name').value.trim(),
     date: eventDate.value,
     endDate: eventEndDate.value || null,
-    time: document.getElementById('event-time').value,
+    allDay: eventAllDay.checked,
+    time: eventAllDay.checked ? '' : eventTime.value,
     person: personRadio ? personRadio.value : 'Both',
     notes: document.getElementById('event-notes').value.trim(),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()

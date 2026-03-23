@@ -465,6 +465,66 @@ header h1 {
   border-color: var(--accent);
 }
 
+/* Form Fields */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+/* Time Row */
+.time-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.time-row input[type="time"] {
+  flex: 1;
+}
+
+.time-row input[type="time"].disabled-time {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.allday-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.allday-toggle input[type="checkbox"] {
+  display: none;
+}
+
+.allday-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 10px 16px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.allday-toggle input[type="checkbox"]:checked + .allday-label {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(74, 158, 255, 0.1);
+}
+
 /* Date Row */
 .date-row {
   display: flex;
