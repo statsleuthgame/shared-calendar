@@ -10,19 +10,32 @@ const modalTitle = document.getElementById('modal-title');
 const eventForm = document.getElementById('event-form');
 const deleteBtn = document.getElementById('delete-btn');
 const cancelBtn = document.getElementById('cancel-btn');
+const eventDate = document.getElementById('event-date');
+const eventEndDate = document.getElementById('event-end-date');
 
 let unsubscribe = null;
+
+// Keep end date >= start date
+eventDate.addEventListener('change', () => {
+  if (eventEndDate.value && eventEndDate.value < eventDate.value) {
+    eventEndDate.value = eventDate.value;
+  }
+  eventEndDate.min = eventDate.value;
+});
 
 // ---- Events ----
 
 function listenToEvents() {
   if (unsubscribe) unsubscribe();
 
+  // Single orderBy to avoid needing a composite index
   unsubscribe = db.collection('events')
     .orderBy('date')
-    .orderBy('time')
     .onSnapshot((snapshot) => {
-      renderEvents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Sort by date then time client-side
+      events.sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''));
+      renderEvents(events);
     }, (err) => {
       console.error('Firestore listen error:', err);
     });
@@ -32,24 +45,32 @@ function renderEvents(events) {
   const now = new Date();
   const todayStr = formatDateISO(now);
 
-  const upcoming = events.filter(e => e.date >= todayStr);
+  // Show events where the end date (or start date if no end) is today or later
+  const upcoming = events.filter(e => {
+    const endDate = e.endDate || e.date;
+    return endDate >= todayStr;
+  });
 
   if (upcoming.length === 0) {
     eventList.innerHTML = '<p class="empty-state">No upcoming events</p>';
     return;
   }
 
-  // Group by date
+  // Group by start date
   const groups = {};
   upcoming.forEach(ev => {
     if (!groups[ev.date]) groups[ev.date] = [];
     groups[ev.date].push(ev);
   });
 
+  // Sort date keys
+  const sortedDates = Object.keys(groups).sort();
+
   let html = '';
   const nowTime = now.getHours() * 60 + now.getMinutes();
 
-  for (const [date, evts] of Object.entries(groups)) {
+  for (const date of sortedDates) {
+    const evts = groups[date];
     const isToday = date === todayStr;
     const dateLabel = formatDateLabel(date);
     html += `<div class="date-group">`;
@@ -60,7 +81,10 @@ function renderEvents(events) {
       const timeStr = formatTime(ev.time);
 
       let pastClass = '';
-      if (isToday && ev.time) {
+      const endDate = ev.endDate || ev.date;
+      if (endDate < todayStr) {
+        pastClass = ' past';
+      } else if (isToday && !ev.endDate && ev.time) {
         const [h, m] = ev.time.split(':').map(Number);
         if (h * 60 + m < nowTime) pastClass = ' past';
       }
@@ -68,12 +92,21 @@ function renderEvents(events) {
       const notesHtml = ev.notes ? `<div class="event-notes">${escapeHtml(ev.notes)}</div>` : '';
       const personLabel = ev.person || 'Both';
 
+      // Date range badge
+      let rangeHtml = '';
+      if (ev.endDate && ev.endDate !== ev.date) {
+        rangeHtml = `<span class="event-range">${formatShortDate(ev.date)} – ${formatShortDate(ev.endDate)}</span>`;
+      }
+
       html += `
         <div class="event-card${pastClass}" data-person="${person}" data-id="${ev.id}">
           <div class="event-time">${timeStr}</div>
           <div class="event-details">
             <div class="event-title">${escapeHtml(ev.name)}</div>
-            <div class="event-person ${person}">${escapeHtml(personLabel)}</div>
+            <div class="event-meta">
+              <span class="event-person ${person}">${escapeHtml(personLabel)}</span>
+              ${rangeHtml}
+            </div>
             ${notesHtml}
           </div>
         </div>`;
@@ -96,7 +129,9 @@ addBtn.addEventListener('click', () => {
   modalTitle.textContent = 'New Event';
   eventForm.reset();
   document.getElementById('event-id').value = '';
-  document.getElementById('event-date').value = formatDateISO(new Date());
+  eventDate.value = formatDateISO(new Date());
+  eventEndDate.value = '';
+  eventEndDate.min = eventDate.value;
   deleteBtn.classList.add('hidden');
   eventModal.classList.remove('hidden');
   document.getElementById('event-name').focus();
@@ -119,11 +154,12 @@ function openEditModal(eventId, events) {
   modalTitle.textContent = 'Edit Event';
   document.getElementById('event-id').value = ev.id;
   document.getElementById('event-name').value = ev.name;
-  document.getElementById('event-date').value = ev.date;
+  eventDate.value = ev.date;
+  eventEndDate.value = ev.endDate || '';
+  eventEndDate.min = ev.date;
   document.getElementById('event-time').value = ev.time;
   document.getElementById('event-notes').value = ev.notes || '';
 
-  // Set person radio
   const personValue = ev.person || 'Both';
   const radio = document.querySelector(`input[name="event-person"][value="${personValue}"]`);
   if (radio) radio.checked = true;
@@ -139,7 +175,8 @@ eventForm.addEventListener('submit', async (e) => {
 
   const data = {
     name: document.getElementById('event-name').value.trim(),
-    date: document.getElementById('event-date').value,
+    date: eventDate.value,
+    endDate: eventEndDate.value || null,
     time: document.getElementById('event-time').value,
     person: personRadio ? personRadio.value : 'Both',
     notes: document.getElementById('event-notes').value.trim(),
@@ -198,6 +235,12 @@ function formatDateLabel(dateStr) {
   }
 
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatShortDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function formatTime(timeStr) {

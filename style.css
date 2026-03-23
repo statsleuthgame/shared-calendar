@@ -162,15 +162,29 @@ main {
   font-weight: 500;
 }
 
+.event-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
 .event-person {
   font-size: 12px;
   font-weight: 600;
-  margin-top: 2px;
 }
 
 .event-person.cody { color: var(--cody); }
 .event-person.stef { color: var(--stef); }
 .event-person.both { color: var(--both); }
+
+.event-range {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
 
 .event-notes {
   font-size: 13px;
@@ -262,6 +276,23 @@ main {
 #event-form input[type="time"]:focus,
 #event-form textarea:focus {
   border-color: var(--accent);
+}
+
+/* Date Row */
+.date-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-row input[type="date"] {
+  flex: 1;
+}
+
+.date-separator {
+  color: var(--text-muted);
+  font-size: 14px;
+  flex-shrink: 0;
 }
 
 /* Person Picker */
