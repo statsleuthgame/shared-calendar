@@ -257,9 +257,12 @@ function escapeHtml(str) {
 
 // ---- Service Worker ----
 
+// Unregister old SW that was caching stale files, then re-register clean one
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(err => {
-    console.log('SW registration failed:', err);
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    registrations.forEach(r => r.unregister());
+  }).then(() => {
+    caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
   });
 }
 
