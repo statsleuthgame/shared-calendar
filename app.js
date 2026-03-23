@@ -207,12 +207,16 @@ function renderCalendar() {
     let personClass = '';
     if (persons) {
       const arr = [...persons];
-      if (arr.length > 1 || arr.includes('both')) {
+      if (arr.length > 1) {
+        personClass = ' cal-both';
+      } else if (arr.includes('both')) {
         personClass = ' cal-both';
       } else if (arr.includes('cody')) {
         personClass = ' cal-cody';
       } else if (arr.includes('stef')) {
         personClass = ' cal-stef';
+      } else if (arr.includes('dogs')) {
+        personClass = ' cal-dogs';
       }
     }
 

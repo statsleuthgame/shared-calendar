@@ -16,6 +16,7 @@
   --cody: #4a9eff;
   --stef: #ff6eb4;
   --both: #a78bfa;
+  --dogs: #f5c542;
   --border: #2a2a4a;
   --radius: 12px;
 }
@@ -163,6 +164,10 @@ header h1 {
   border-left-color: var(--both);
 }
 
+.event-card[data-person="dogs"] {
+  border-left-color: var(--dogs);
+}
+
 .event-time {
   font-size: 14px;
   font-weight: 600;
@@ -196,6 +201,7 @@ header h1 {
 .event-person.cody { color: var(--cody); }
 .event-person.stef { color: var(--stef); }
 .event-person.both { color: var(--both); }
+.event-person.dogs { color: var(--dogs); }
 
 .event-range {
   font-size: 11px;
@@ -316,6 +322,12 @@ header h1 {
 .cal-day.cal-cody .cal-day-num { color: var(--cody); font-weight: 600; }
 .cal-day.cal-stef .cal-day-num { color: var(--stef); font-weight: 600; }
 .cal-day.cal-both .cal-day-num { color: var(--both); font-weight: 600; }
+
+.cal-day.cal-dogs {
+  background: rgba(245, 197, 66, 0.2);
+}
+
+.cal-day.cal-dogs .cal-day-num { color: var(--dogs); font-weight: 600; }
 
 #cal-day-events {
   border-top: 1px solid var(--border);
@@ -514,6 +526,12 @@ header h1 {
   border-color: var(--both);
   color: var(--both);
   background: rgba(167, 139, 250, 0.1);
+}
+
+.person-option input[type="radio"]:checked + .person-label.dogs {
+  border-color: var(--dogs);
+  color: var(--dogs);
+  background: rgba(245, 197, 66, 0.1);
 }
 
 .modal-actions {
