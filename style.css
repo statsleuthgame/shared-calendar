@@ -341,10 +341,35 @@ header h1 {
 .cal-day.cal-both .cal-day-num { color: var(--both); font-weight: 600; }
 .cal-day.cal-dogs .cal-day-num { color: var(--dogs); font-weight: 600; }
 
-.cal-day.cal-cody { border-bottom: 3px solid var(--cody); padding-bottom: 3px; }
-.cal-day.cal-stef { border-bottom: 3px solid var(--stef); padding-bottom: 3px; }
-.cal-day.cal-both { border-bottom: 3px solid var(--both); padding-bottom: 3px; }
-.cal-day.cal-dogs { border-bottom: 3px solid var(--dogs); padding-bottom: 3px; }
+.cal-day.cal-cody,
+.cal-day.cal-stef,
+.cal-day.cal-both,
+.cal-day.cal-dogs {
+  position: relative;
+}
+
+.cal-day.cal-cody::after,
+.cal-day.cal-stef::after,
+.cal-day.cal-both::after,
+.cal-day.cal-dogs::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+
+.cal-day.cal-cody::after { background: var(--cody); }
+.cal-day.cal-stef::after { background: var(--stef); }
+.cal-day.cal-both::after { background: var(--both); }
+.cal-day.cal-dogs::after { background: var(--dogs); }
+
+/* Respect streak rounding on the bottom line */
+.cal-day.streak-start::after { border-radius: 0 0 0 10px; }
+.cal-day.streak-end::after { border-radius: 0 0 10px 0; }
+.cal-day.streak-mid::after { border-radius: 0; }
+.cal-day:not(.streak-start):not(.streak-mid):not(.streak-end)::after { border-radius: 0 0 10px 10px; }
 
 /* Tally dots */
 .cal-tally {
