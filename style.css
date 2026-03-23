@@ -366,11 +366,19 @@ header h1 {
 .cal-day.cal-both::after { background: #beaafc; }
 .cal-day.cal-dogs::after { background: #f7d76a; }
 
-/* Match bottom line rounding to the cell's rounding */
-.cal-day:not(.streak-start):not(.streak-mid):not(.streak-end)::after { border-radius: 0 0 10px 10px; }
-.cal-day.streak-start::after { border-radius: 0; }
-.cal-day.streak-end::after { border-radius: 0 0 10px 0; }
-.cal-day.streak-mid::after { border-radius: 0; }
+/* Inset the line so it stops before rounded edges */
+.cal-day.cal-cody::after,
+.cal-day.cal-stef::after,
+.cal-day.cal-both::after,
+.cal-day.cal-dogs::after {
+  left: 8px;
+  right: 8px;
+  border-radius: 2px;
+}
+
+.cal-day.streak-start::after { left: 8px; right: 0; }
+.cal-day.streak-end::after { left: 0; right: 8px; }
+.cal-day.streak-mid::after { left: 0; right: 0; }
 
 /* Tally dots */
 .cal-tally {
