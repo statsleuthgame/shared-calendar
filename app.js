@@ -226,14 +226,10 @@ function renderListView() {
 
   var groups = {};
   upcoming.forEach(function (ev) {
-    forEachDayInRange(ev.date, ev.endDate || ev.date, function (key) {
-      if (key >= todayStr) {
-        if (!groups[key]) groups[key] = [];
-        if (!groups[key].find(function (e) { return e.id === ev.id; })) {
-          groups[key].push(ev);
-        }
-      }
-    });
+    // Place multi-day events under their start date, or today if already started
+    var groupKey = ev.date >= todayStr ? ev.date : todayStr;
+    if (!groups[groupKey]) groups[groupKey] = [];
+    groups[groupKey].push(ev);
   });
 
   var sortedDates = Object.keys(groups).sort();
