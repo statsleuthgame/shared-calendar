@@ -1,8 +1,9 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /events/{eventId} {
-      allow read, create, update, delete: if true;
+    match /events/{event} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null;
     }
   }
 }

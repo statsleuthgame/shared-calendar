@@ -1,3 +1,6 @@
+// Firebase web app config — these keys are designed to be public in client-side code.
+// Security is enforced by Firestore Security Rules (firestore.rules), not by hiding this config.
+// See: https://firebase.google.com/docs/projects/api-keys#api-keys-for-firebase-are-different
 const firebaseConfig = {
   apiKey: "AIzaSyCvj_y50PVsSea88XU15gwlgEbyTHkce4c",
   authDomain: "shared-calendar-93fd6.firebaseapp.com",
